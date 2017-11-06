@@ -1,0 +1,134 @@
+//-----------------------------------------------------
+// Design Name : E155 Final Project
+// File Name   : e155FP
+// Function    : Verilog File for Osciolloscope Project
+//-----------------------------------------------------
+
+/*
+  Created: 9/1/2017
+  Name: Isabel Martos-Repath and Alex Echeverria
+  Email: imartosrepath@g.hmc.edu aecheverria@g.hmc.edu
+  Purpose: This is the top level module designed to run osciolloscope
+  functionality on FPGA
+*/
+module  e155FP   (
+clk, // the 40 MHz clock
+s, // the four DIP switches
+led, // the 8 lights on the LED bar
+seg // the segments of a common-anode 7-segment display
+);
+//----------Input Ports--------------
+     input logic clk;
+	  input logic [3:0]s;
+	  
+//------------Output Ports--------------
+     output logic [7:0]led;
+	  output logic [6:0]seg;
+
+//-------------Code Starts Here-------
+				 
+reg [32:0] counter;
+assign led[7] = counter[23]; // <------ data to change
+
+/* Flash LED 7 at 2.4 Hz*/
+always @ (posedge clk) begin
+	 counter <= counter + 1;
+end
+
+reg [6:0] ledForModule;
+
+assign ledForModule = led[6:0];
+/*Call other modules*/
+hexDisplay hexDisp(s,seg);
+ledDisplay ledDisp(s,ledforModule);
+
+endmodule 
+
+
+
+
+/*
+  Created: 9/1/2017
+  Name: Alex Echeverria
+  Email: aecheverria@g.hmc.edu
+  Purpose: This is the low level logic for the on board LED's 
+  controlled by the on board switches
+*/
+module ledDisplay(s,led);
+
+input logic [3:0]s;
+output logic [6:0]led;
+
+//Table 1
+assign led[0] = s[0];
+assign led[1] = ~s[0];
+//Table 2
+assign led[2] = s[1];
+assign led[3] = ~s[1];
+//Table 3
+assign led[4] = s[2];
+assign led[5] = ~s[2];
+//Table 4
+assign led[6] = s[2]&s[3];
+
+endmodule
+
+/*
+  Created: 9/1/2017
+  Name: Alex Echeverria
+  Email: aecheverria@g.hmc.edu
+  Purpose: This is the low level module for the external 
+  hex led display
+*/
+module hexDisplay(s,seg);
+input logic [3:0]s;
+output logic [6:0]seg;
+
+always_comb begin
+case(s)
+				       //abcdefg
+	4'b0000 : seg = 7'b1111110; //0
+           
+	4'b0001 : seg = 7'b0110000; //1
+	
+	4'b0010 : seg = 7'b1101101; //2
+	
+	4'b0011 : seg = 7'b1111001; //3
+	
+	4'b0100 : seg = 7'b0110011; //4
+	
+	4'b0101 : seg = 7'b1011011; //5
+	
+	4'b0110 : seg = 7'b1011111; //6
+	
+	4'b0111 : seg = 7'b1110000; //7
+	
+	4'b1000 : seg = 7'b1111111; //8
+	
+	4'b1001 : seg = 7'b1110011; //9
+	
+	4'b1010 : seg = 7'b1110111; //A
+	
+	4'b1011 : seg = 7'b0011111; //b
+	
+	4'b1100 : seg = 7'b1001110; //C
+	
+	4'b1101 : seg = 7'b0111101; //d
+	
+	4'b1110 : seg = 7'b1001111; //E
+	
+	4'b1111 : seg = 7'b1000111; //F	
+			
+			
+  default :	seg = 7'b1111111; 
+  
+endcase
+
+end
+endmodule
+
+
+
+
+   
+    
