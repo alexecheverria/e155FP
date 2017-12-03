@@ -1,5 +1,5 @@
 #include <stdio.h>
-
+#include "EasyPIO.h"
 
 void updatePins(int timeScale[], int newNumber,int dataPi,int evenOrOdd){
 	   //TimeScale Pins
@@ -38,13 +38,13 @@ void updatePins(int timeScale[], int newNumber,int dataPi,int evenOrOdd){
    
 
    /*Time Scale Logic*/
-   bool timeScale[6]; // [x volts/div, y volts div, 1 volt/div
+   int  timeScale[6]; // [x volts/div, y volts div, 1 volt/div
  
 
-   bool evenOrOdd;
-   bool nextBit;
-   bool dataPi;
-   bool newNumber;
+   int evenOrOdd;
+   int nextBit;
+   int dataPi;
+   int newNumber;
 
 
    float dataToPlot;
@@ -53,23 +53,23 @@ void updatePins(int timeScale[], int newNumber,int dataPi,int evenOrOdd){
 
    int counter = 12;
    int timeCount = 0;
-   bool timeCountTrue = 0;
+   int timeCountTrue = 0;
 
 
-   float delta t0.0000128;
+   float deltaT=0.0000128;
 
-   while(true){
+   while(1){
    	   
    	 
    	   //log data in .data
    	  while(timeCountTrue){
    	  		
 	   	  		  //get data from FPGA
-	   	   for(counter = 12; counter > 0, counter = counter-1){
-	   	   		updatePins(timeScale,voltsScale,newNumber,dataPi,evenOrOdd);
+	   	   for(counter = 12; counter > 0; counter = counter-1){
+	   	   		updatePins(timeScale,newNumber,dataPi,evenOrOdd);
 	   	   		//Turn serial data to number
-	   	   		dataToPlot = (2**(counter+1)*dataPi)*conversionFactor;
-	   			nextBit = evenOrOdd
+	   	   		dataToPlot = (2^(counter+1)*dataPi)*conversionFactor;
+	   			nextBit = evenOrOdd;
 	   			//Wait for next bit
 	   			while(nextBit == evenOrOdd){
 	   				//update new pins
@@ -99,12 +99,13 @@ void updatePins(int timeScale[], int newNumber,int dataPi,int evenOrOdd){
 	   	  }
 	   	  else if(timeScale[0] == 1){
 			timeCountTrue = !(timeCount == 1);
-
+	        	}
 			timeToPlot = timeCount*deltaT;
 			timeCount = timeCount + 1;
 			FILE * fp;
 			/* open the file for writing*/
-			fp = fopen ("values.data","a");
+			if(timeCount < 2) fp = fopen("values.data","w"); 
+			else fp = fopen ("values.data","a");
 			fprintf (fp, "%f %f\n",timeToPlot,dataToPlot);
 			/* close the file*/  
 			fclose (fp);
