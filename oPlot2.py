@@ -8,6 +8,7 @@ Run this program by typing python oPlot2.py
 
 from numpy import *
 import Gnuplot, Gnuplot.funcutils
+import commands
 
 
 def setupScopeScreen(g):
@@ -20,19 +21,29 @@ def setupScopeScreen(g):
 def display():
 	"""Demonstrate the Gnuplot package."""
 
+	yAxisBound = commands.getstatusoutput('sudo ./readVoltsScale')
+
 	#Create a plot of current Oscilloscope Output
 	g = Gnuplot.Gnuplot(debug=1)
 	#Setup title, axis labels etc.
-	#g = setupScopeScreen(g)
 	g.title('MicrOscope')
-	g('set data style linespoints')
-#	g.plot([[0,0],[1,1],[2,1],[3,1],[1.5,1],[2.5,1]])
+	g('set style data linespoints')
+	g('set grid')
 	databuff = Gnuplot.File("values.data",using='1:2')
 	g.plot(databuff)
+
+	#Setting the volts/div
+	if(yAxisBound[1] == '13'):
+		g('set yrange ["0":"5"]')
+	elif(yAxisBound[1] == '19'):
+		g('set yrange ["0":"2.5"]')
+	elif(yAxisBound[1] =='26'):
+		g('set yrange ["2.5":"5"]')
+	else:
+		g('set yrange ["0":"5"]')
+
 	g.hardcopy(filename="micrOscopeOutput.png",terminal="png")
-	raw_input('Please press return to continue....\n')
-
-
+#	raw_input('Please press return to continue....\n')
 
 #when executed, just run demo():
 if __name__ == '__main__':
