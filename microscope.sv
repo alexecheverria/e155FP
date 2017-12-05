@@ -2,91 +2,56 @@
 // E155 Final Project: MicrOscope
 // I. Martos-Repath & A. Echeverria
 // First written on 18 November 2017
-// Updated 20 November 2017
+// Updated 4 December 2017
 //////////////////////////////////////////////
-
-/////////////////////////
-// Pin Assignments!
-// Since we are using a different ADC from what is on the MuddPi
-// (an MCP3002), we need to assign some of the pins on the MuddPi
-// to correspond with our ADC pins. Can also find this on the schematic.
-// clk (ADC Pin 7) = ADC_sclk (FPGA Pin 30)
-// Data (ADC Pin 6) = ADC_MISO (FPGA Pin 31)
-// Conv (ADC Pin 5) = ADC_MOSI (FPGA Pin 32)
-// FPGA pins...
-// clk (from onboard oscillator) is Pin 88
-// output codes on Pin 34
-// reset on Pin 38
-/////////////////////////
 
 /////////////////////////
 // ADC_FPGA_SPImaster module
 // Function: FPGA (acting as master) gets output codes from ADC (acting as slave)
 /////////////////////////
-module microscope(input logic clk, reset, ADC_MISO,					//for testing SPI, called microscope, rename to ADC_FPGA_SPImaster
-			output logic ADC_sclk, ADC_MOSI, outputcode);
+module microscope(input logic clk, reset, ADC0_MISO,ADC1_MISO,pi_sclk,pi_MOSI,
+						input logic [5:0]timeScale,
+						input logic [2:0]voltsScale,
+						input logic [1:0]filterSelect,
+						output logic [7:0]led,
+						output logic ADC0_sclk, ADC0_MOSI,ADC1_sclk, ADC1_MOSI,pi_MISO,empty);
+
+	logic [7:0]scopeOut,signalOutWide;
+	logic [7:0]untriggeredSignal;
+	logic [7:0]q,d;
+	logic [11:0]scopeIn;
+	logic newNumber;
+	logic ADC_sclk;
+	logic [11:0]trigLevel;
 	
-	logic conv; //needs to go low to start collecting from ADC
-	logic [4:0]slowcount; //counter for negative edges of sclk
+	
 	logic [31:0]counter; //counter for clock divider to make sclk
-	
-	typedef enum logic [1:0] {S0,S1,S2,S3} statetype; //logic for state machine
-	statetype state, nextstate;
-	
 	//logic to generate sclk to pass to ADC slave
-	always_ff@(posedge clk, posedge reset)
+	always_ff@(posedge clk, posedge reset) begin
 		if(reset) counter <= 32'b0;
 		else begin
 		counter <= counter + 1;
 		end
+	end
+	assign led = trigLevel[11:4];
 	assign ADC_sclk = counter[4];
+	assign ADC0_sclk  = ADC_sclk;
+	assign ADC1_sclk  = ADC_sclk;
 	
-	//establishes counter for FSM
-	always_ff@(negedge ADC_sclk)
-		if(conv) slowcount <= 1;
-		else slowcount = slowcount + 5'b1;
-		
-	//state register
-	always_ff@(negedge ADC_sclk, posedge reset)
-		if(reset) state <= S0;
-		else state <= nextstate;
-		
-	//FSM for the SPI timing diagram
-	always_comb
-		case(state)
-			S0: if(~conv) nextstate = S1;
-				 else nextstate = S0;
-			S1: if(slowcount==5'b00010) nextstate = S2;
-				 else nextstate = S1;
-			S2: if(slowcount==5'b01110) nextstate = S3;
-				 else nextstate = S2;
-			S3: if(slowcount==5'b10000) nextstate = S0;
-				 else nextstate = S3;
-			default: nextstate = S0;
-		endcase
-				 
-	//output logic
-	assign en = (state==S2); //enable to read DATA
-	assign conv = (slowcount==5'b10000); //once slowcount is 16, drive conv high again
+	ADC triggerLevel(ADC_sclk,reset,ADC0_MISO,ADC0_MOSI,trigLevel);
+	ADC channel1(ADC_sclk,reset,ADC1_MISO,ADC1_MOSI,scopeIn,newNumber);
+	filter lowOrNot(newNumber,reset,scopeIn[11:4],filterSelect,untriggeredSignal);
+	trig trigger(untriggeredSignal,trigLevel[11:4],timeScale,ADC_sclk,reset,scopeOut);
+	voltsScale scaleOutput(voltsScale,scopeOut,signalOutWide);
 	
-	//create a shift register
-	logic [11:0]shiftReg;
+	pi(pi_sclk,reset,pi_MOSI,pi_MISO,d,q);
 	
-	//this shift register is where ADC will be shifting bits into
-	always_ff@(posedge ADC_sclk, posedge reset)
-		if(reset) shiftReg<= 0;
-		else if(en)
-			begin
-				outputcode <= shiftReg[11];
-				shiftReg <= shiftReg << 1;
-				shiftReg[0] <= ADC_MISO;
-			  end
-		else shiftReg <= shiftReg;
+	//pi(pi_sclk,reset,pi_MOSI,pi_MISO,8'b11000100,q);
 	
-	//signal from master FPGA to slave ADC is conv
-	assign ADC_MOSI = conv;
+	logic full;
+	logic writeEn_in;
+	assign writeEn_in = 1;
+	
+	   aFifo buffer(d, empty, pi_MOSI, pi_sclk, signalOutWide,full, writeEn_in,newNumber,reset);
 
 endmodule
-
-//the slave will have its MOSI as conv, which when written low causes the ADC
-//to send output codes back over MISO
